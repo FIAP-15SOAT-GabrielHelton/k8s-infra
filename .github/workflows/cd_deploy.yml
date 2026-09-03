@@ -1,0 +1,81 @@
+name: CD Deploy (VPC & EKS)
+
+# Disparo manual — as credenciais AWS Academy são passadas como inputs porque
+# tokens de sessão expiram em ~4h e não podem ser armazenados como secrets fixos.
+on:
+  workflow_dispatch:
+    inputs:
+      aws_access_key_id:
+        description: 'AWS Access Key ID (AWS Academy)'
+        required: true
+        type: string
+      aws_secret_access_key:
+        description: 'AWS Secret Access Key (AWS Academy)'
+        required: true
+        type: string
+      aws_session_token:
+        description: 'AWS Session Token (AWS Academy)'
+        required: true
+        type: string
+
+concurrency:
+  group: oficina-mecanica-k8s-infra
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    name: Provision VPC & EKS
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v5
+
+      - name: Mask Sensitive Credentials
+        run: |
+          echo "::add-mask::${{ inputs.aws_access_key_id }}"
+          echo "::add-mask::${{ inputs.aws_secret_access_key }}"
+          echo "::add-mask::${{ inputs.aws_session_token }}"
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v6
+        with:
+          aws-access-key-id: ${{ inputs.aws_access_key_id }}
+          aws-secret-access-key: ${{ inputs.aws_secret_access_key }}
+          aws-session-token: ${{ inputs.aws_session_token }}
+          aws-region: us-east-1
+
+      # O bucket S3 é compartilhado entre os 4 repositórios do projeto (cada um
+      # com sua própria key de state). Criado via CLI para evitar o
+      # chicken-and-egg do terraform init precisar do backend já existir.
+      - name: Bootstrap S3 Backend
+        run: |
+          ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+          TF_BUCKET="oficina-mecanica-tfstate-${ACCOUNT_ID}"
+
+          if aws s3api head-bucket --bucket "$TF_BUCKET" 2>/dev/null; then
+            echo "Bucket $TF_BUCKET já existe. Reutilizando..."
+          else
+            echo "Criando bucket $TF_BUCKET..."
+            aws s3api create-bucket --bucket "$TF_BUCKET" --region us-east-1
+          fi
+
+          echo "TF_BUCKET=$TF_BUCKET" >> "$GITHUB_ENV"
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v4
+        with:
+          terraform_version: 1.5.7
+          terraform_wrapper: false
+
+      # Provisiona VPC, EKS cluster, node group e metrics-server, e publica
+      # vpc_id/subnet_ids/eks_cluster_name no SSM Parameter Store para os
+      # repositórios db-infra e api consumirem.
+      - name: Terraform Provisioning
+        run: |
+          cd infra/
+          terraform init \
+            -backend-config="bucket=$TF_BUCKET" \
+            -backend-config="key=oficina-mecanica/k8s-infra.tfstate" \
+            -backend-config="region=us-east-1"
+
+          terraform apply -auto-approve

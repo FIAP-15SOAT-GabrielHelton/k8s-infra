@@ -1,0 +1,58 @@
+name: 'Infra Destroy'
+description: 'Remove o cluster EKS, node group e VPC via Terraform'
+
+inputs:
+  aws_access_key_id:
+    description: 'AWS Access Key ID'
+    required: true
+  aws_secret_access_key:
+    description: 'AWS Secret Access Key'
+    required: true
+  aws_session_token:
+    description: 'AWS Session Token'
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Mask Sensitive Credentials
+      shell: bash
+      run: |
+        echo "::add-mask::${{ inputs.aws_access_key_id }}"
+        echo "::add-mask::${{ inputs.aws_secret_access_key }}"
+        echo "::add-mask::${{ inputs.aws_session_token }}"
+
+    - name: Configure AWS Credentials
+      uses: aws-actions/configure-aws-credentials@v6
+      with:
+        aws-access-key-id: ${{ inputs.aws_access_key_id }}
+        aws-secret-access-key: ${{ inputs.aws_secret_access_key }}
+        aws-session-token: ${{ inputs.aws_session_token }}
+        aws-region: us-east-1
+
+    - name: Bootstrap S3 Backend
+      shell: bash
+      run: |
+        ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+        TF_BUCKET="oficina-mecanica-tfstate-${ACCOUNT_ID}"
+        echo "TF_BUCKET=$TF_BUCKET" >> "$GITHUB_ENV"
+
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v4
+      with:
+        terraform_version: 1.5.7
+        terraform_wrapper: false
+
+    # Node group e cluster precisam ser destruídos antes da VPC. Os outros repos
+    # (db-infra, api) devem ser destruídos antes deste, já que dependem dos
+    # parâmetros SSM publicados aqui.
+    - name: Destroy Infrastructure
+      shell: bash
+      run: |
+        cd infra/
+        terraform init \
+          -backend-config="bucket=$TF_BUCKET" \
+          -backend-config="key=oficina-mecanica/k8s-infra.tfstate" \
+          -backend-config="region=us-east-1"
+
+        terraform destroy -auto-approve
