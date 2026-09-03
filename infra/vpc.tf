@@ -23,8 +23,8 @@ resource "aws_subnet" "public_a" {
   map_public_ip_on_launch = true
 
   tags = {
-    Name                                            = "oficina-mecanica-public-a"
-    "kubernetes.io/role/elb"                        = "1"
+    Name                                             = "oficina-mecanica-public-a"
+    "kubernetes.io/role/elb"                         = "1"
     "kubernetes.io/cluster/oficina-mecanica-cluster" = "shared"
   }
 }
@@ -36,8 +36,8 @@ resource "aws_subnet" "public_b" {
   map_public_ip_on_launch = true
 
   tags = {
-    Name                                            = "oficina-mecanica-public-b"
-    "kubernetes.io/role/elb"                        = "1"
+    Name                                             = "oficina-mecanica-public-b"
+    "kubernetes.io/role/elb"                         = "1"
     "kubernetes.io/cluster/oficina-mecanica-cluster" = "shared"
   }
 }
