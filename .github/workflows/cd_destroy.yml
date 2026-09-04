@@ -1,0 +1,38 @@
+name: CD Destroy (VPC & EKS)
+
+# Disparo manual para destruição imediata do ambiente. Rodar só depois de
+# destruir db-infra e api, que dependem dos parâmetros SSM publicados aqui.
+on:
+  workflow_dispatch:
+    inputs:
+      aws_access_key_id:
+        description: 'AWS Access Key ID (AWS Academy)'
+        required: true
+        type: string
+      aws_secret_access_key:
+        description: 'AWS Secret Access Key (AWS Academy)'
+        required: true
+        type: string
+      aws_session_token:
+        description: 'AWS Session Token (AWS Academy)'
+        required: true
+        type: string
+
+concurrency:
+  group: oficina-mecanica-k8s-infra
+  cancel-in-progress: true
+
+jobs:
+  destroy:
+    name: Destroy VPC & EKS
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v5
+
+      - name: Destroy Infrastructure
+        uses: ./.github/actions/infra-destroy
+        with:
+          aws_access_key_id: ${{ inputs.aws_access_key_id }}
+          aws_secret_access_key: ${{ inputs.aws_secret_access_key }}
+          aws_session_token: ${{ inputs.aws_session_token }}
