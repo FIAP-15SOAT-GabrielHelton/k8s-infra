@@ -35,6 +35,8 @@ jobs:
           echo "::add-mask::${{ inputs.aws_access_key_id }}"
           echo "::add-mask::${{ inputs.aws_secret_access_key }}"
           echo "::add-mask::${{ inputs.aws_session_token }}"
+          echo "::add-mask::${{ secrets.NEW_RELIC_LICENSE_KEY }}"
+          echo "::add-mask::${{ secrets.NEW_RELIC_API_KEY }}"
 
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v6
@@ -67,10 +69,17 @@ jobs:
           terraform_version: 1.5.7
           terraform_wrapper: false
 
-      # Provisiona VPC, EKS cluster, node group e metrics-server, e publica
-      # vpc_id/subnet_ids/eks_cluster_name no SSM Parameter Store para os
-      # repositórios db-infra e api consumirem.
+      # Provisiona VPC, EKS cluster, node group, metrics-server, a integração
+      # New Relic Kubernetes (CPU/memória do cluster) e o dashboard/alertas no
+      # New Relic, e publica vpc_id/subnet_ids/eks_cluster_name no SSM
+      # Parameter Store para os repositórios db-infra e api consumirem.
       - name: Terraform Provisioning
+        env:
+          TF_VAR_new_relic_license_key: ${{ secrets.NEW_RELIC_LICENSE_KEY }}
+          TF_VAR_new_relic_account_id: ${{ secrets.NEW_RELIC_ACCOUNT_ID }}
+          TF_VAR_new_relic_api_key: ${{ secrets.NEW_RELIC_API_KEY }}
+          TF_VAR_new_relic_region: ${{ vars.NEW_RELIC_REGION }}
+          TF_VAR_new_relic_alert_email: ${{ vars.NEW_RELIC_ALERT_EMAIL }}
         run: |
           cd infra/
           terraform init \

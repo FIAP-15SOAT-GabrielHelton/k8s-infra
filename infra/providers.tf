@@ -13,6 +13,10 @@ terraform {
       source  = "hashicorp/helm"
       version = "~> 2.0"
     }
+    newrelic = {
+      source  = "newrelic/newrelic"
+      version = "~> 3.0"
+    }
   }
   backend "s3" {}
 }
@@ -39,4 +43,10 @@ provider "helm" {
     cluster_ca_certificate = try(base64decode(aws_eks_cluster.main.certificate_authority[0].data), "")
     token                  = try(data.aws_eks_cluster_auth.cluster.token, "")
   }
+}
+
+provider "newrelic" {
+  account_id = var.new_relic_account_id
+  api_key    = var.new_relic_api_key
+  region     = var.new_relic_region
 }
