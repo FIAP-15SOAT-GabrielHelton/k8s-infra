@@ -109,6 +109,17 @@ Workflow `CD Deploy (VPC & EKS)` (`workflow_dispatch`), recebendo as credenciais
 
 **Ordem de deploy do projeto**: `k8s-infra` → `db-infra` → `api` → `auth-serverless` (ou use o [`deploy-orchestrator`](https://github.com/FIAP-15SOAT-GabrielHelton/deploy-orchestrator) para disparar tudo de uma vez).
 
+## Observabilidade
+
+Este repositório provisiona a camada de monitoramento de infraestrutura e o controle central do New Relic:
+
+- **New Relic Infrastructure** (`nri-kubernetes`, Helm chart `newrelic/nri-bundle`) — coleta CPU/memória do cluster EKS (nodes e pods).
+- **Dashboard e policy de alertas** (provider Terraform `newrelic`) — dashboard com volume diário de OS, tempo médio de execução por etapa e erros/falhas de integração; alertas por e-mail para latência elevada, falhas no processamento de OS/orçamentos e indisponibilidade do healthcheck. Consulta dados enviados por `api` e `auth-serverless`, mas fica centralizado aqui por ser a infraestrutura observacional do projeto.
+
+Secrets/variáveis do repositório: `NEW_RELIC_LICENSE_KEY`, `NEW_RELIC_ACCOUNT_ID`, `NEW_RELIC_API_KEY` (secrets) e `NEW_RELIC_REGION`, `NEW_RELIC_ALERT_EMAIL` (variables, não sensíveis).
+
+Detalhes de arquitetura: [`docs/fase3/architecture/component-diagram.md`](https://github.com/FIAP-15SOAT-GabrielHelton/api/blob/main/docs/fase3/architecture/component-diagram.md#4-monitoramento) e [ADR 11](https://github.com/FIAP-15SOAT-GabrielHelton/api/blob/main/docs/fase3/architecture/adr-log.md#adr-11-new-relic-como-ferramenta-de-observabilidade-e-monitoramento) (repositório `api`).
+
 ## Destroy
 
 Workflow `CD Destroy (VPC & EKS)`. **Deve rodar por último** (depois de `db-infra` e `api`), pois eles dependem dos parâmetros SSM publicados aqui.

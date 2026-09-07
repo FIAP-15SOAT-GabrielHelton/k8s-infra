@@ -11,6 +11,21 @@ inputs:
   aws_session_token:
     description: 'AWS Session Token'
     required: true
+  new_relic_license_key:
+    description: 'New Relic Ingest License Key'
+    required: true
+  new_relic_account_id:
+    description: 'New Relic Account ID'
+    required: true
+  new_relic_api_key:
+    description: 'New Relic User API Key'
+    required: true
+  new_relic_region:
+    description: 'New Relic account region (US ou EU)'
+    required: true
+  new_relic_alert_email:
+    description: 'E-mail que recebe notificações de alerta'
+    required: true
 
 runs:
   using: composite
@@ -21,6 +36,8 @@ runs:
         echo "::add-mask::${{ inputs.aws_access_key_id }}"
         echo "::add-mask::${{ inputs.aws_secret_access_key }}"
         echo "::add-mask::${{ inputs.aws_session_token }}"
+        echo "::add-mask::${{ inputs.new_relic_license_key }}"
+        echo "::add-mask::${{ inputs.new_relic_api_key }}"
 
     - name: Configure AWS Credentials
       uses: aws-actions/configure-aws-credentials@v6
@@ -48,6 +65,12 @@ runs:
     # parâmetros SSM publicados aqui.
     - name: Destroy Infrastructure
       shell: bash
+      env:
+        TF_VAR_new_relic_license_key: ${{ inputs.new_relic_license_key }}
+        TF_VAR_new_relic_account_id: ${{ inputs.new_relic_account_id }}
+        TF_VAR_new_relic_api_key: ${{ inputs.new_relic_api_key }}
+        TF_VAR_new_relic_region: ${{ inputs.new_relic_region }}
+        TF_VAR_new_relic_alert_email: ${{ inputs.new_relic_alert_email }}
       run: |
         cd infra/
         terraform init \
