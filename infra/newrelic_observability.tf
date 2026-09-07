@@ -81,7 +81,7 @@ resource "newrelic_one_dashboard" "oficina_mecanica" {
       height = 3
 
       nrql_query {
-        query = "SELECT percentage(count(*), WHERE httpResponseCode < '500') AS 'Uptime %' FROM Transaction WHERE name = 'Controller/rails/health/show' SINCE 1 day ago"
+        query = "SELECT percentage(count(*), WHERE error IS false) AS 'Uptime %' FROM Transaction WHERE name = 'Controller/rails/health/show' SINCE 1 day ago"
       }
     }
 
@@ -213,7 +213,7 @@ resource "newrelic_nrql_alert_condition" "low_uptime" {
   violation_time_limit_seconds = 3600
 
   nrql {
-    query = "SELECT percentage(count(*), WHERE httpResponseCode < '500') FROM Transaction WHERE name = 'Controller/rails/health/show'"
+    query = "SELECT percentage(count(*), WHERE error IS false) FROM Transaction WHERE name = 'Controller/rails/health/show'"
   }
 
   critical {
