@@ -25,7 +25,7 @@ Este repositório faz parte de um conjunto de 5 (a arquitetura completa está de
 | IaC | Terraform (`hashicorp/aws` ~> 5.0, `hashicorp/kubernetes` ~> 2.0, `hashicorp/helm` ~> 2.0) |
 | Nuvem | AWS (VPC, EKS, IAM `LabRole` do AWS Academy) |
 | Add-on de cluster | `metrics-server` (via provider Helm) |
-| CI/CD | GitHub Actions (`workflow_dispatch`) |
+| CI/CD | GitHub Actions (`pull_request` para validação, `workflow_dispatch` para deploy/destroy) |
 | Backend do state | S3 (bucket compartilhado com os demais repositórios, key própria) |
 
 ## Arquitetura
@@ -103,9 +103,24 @@ terraform init \
 terraform plan
 ```
 
+## CI
+
+Workflow `CI (Terraform Validate)` (`.github/workflows/ci.yml`), disparado em toda Pull Request contra `main` que toque em `infra/**` — é o status check exigido pela proteção da branch `main` antes do merge. Como não há credenciais AWS disponíveis automaticamente em PR (só existem via input manual no `workflow_dispatch` de deploy), a validação é limitada ao que não depende de nuvem real:
+
+1. **Terraform Format Check** (`terraform fmt -check -recursive`) — garante que todo `.tf` está formatado no padrão canônico.
+2. **Terraform Init sem backend** (`terraform init -backend=false`) — baixa os providers só para permitir a validação sintática, sem tentar acessar o bucket S3 remoto.
+3. **Terraform Validate** (`terraform validate`) — valida sintaxe, tipos e referências internas do código (detecta, por exemplo, o erro de `resource "newrelic_dashboard"` vs. o nome correto `newrelic_one_dashboard` antes mesmo de chegar num `apply`).
+
+Não roda `terraform plan` nesta etapa — um plan real exigiria as credenciais efêmeras da sessão AWS Academy, que só chegam no momento do deploy manual.
+
 ## Deploy
 
-Workflow `CD Deploy (VPC & EKS)` (`workflow_dispatch`), recebendo as credenciais temporárias da sessão do AWS Academy (Access Key, Secret Key, Session Token — expiram em ~4h, por isso não ficam salvas como secret).
+Workflow `CD Deploy (VPC & EKS)` (`.github/workflows/cd_deploy.yml`, `workflow_dispatch`), disparado manualmente informando as credenciais temporárias da sessão do AWS Academy (Access Key, Secret Key, Session Token — expiram em ~4h, por isso não ficam salvas como secret fixo). Passos do job `deploy`:
+
+1. **Mask Sensitive Credentials** — mascara as credenciais AWS e as chaves do New Relic no log do Actions (`::add-mask::`).
+2. **Configure AWS Credentials** — autentica a sessão via `aws-actions/configure-aws-credentials`.
+3. **Bootstrap S3 Backend** — cria (se ainda não existir) o bucket S3 compartilhado de state do Terraform entre os 4 repositórios (`oficina-mecanica-tfstate-<account-id>`), resolvendo o problema de o `terraform init` precisar de um backend que ainda não existe na primeira execução.
+4. **Terraform Provisioning** — `terraform init` (contra o backend recém-garantido) + `terraform apply -auto-approve`, provisionando VPC, cluster EKS, node group (com autoscaling), `metrics-server`, a integração New Relic Kubernetes e o dashboard/alertas do New Relic, publicando `vpc_id`/`subnet_ids`/`eks_cluster_name` no SSM Parameter Store para `db-infra` e `api` consumirem.
 
 **Ordem de deploy do projeto**: `k8s-infra` → `db-infra` → `api` → `auth-serverless` (ou use o [`deploy-orchestrator`](https://github.com/FIAP-15SOAT-GabrielHelton/deploy-orchestrator) para disparar tudo de uma vez).
 
