@@ -140,6 +140,17 @@ resource "newrelic_notification_channel" "email" {
   }
 }
 
+# Workflow ja existia na conta (orfao de uma sessao anterior cujo state nao
+# sobreviveu no S3) - o apply original falhou com DUPLICATE ao tentar criar
+# um novo com o mesmo nome. Este bloco importa o existente para o state em
+# vez de recriar, e o proximo apply so atualiza policy_id/channel_id para os
+# recem-criados nesta rodada. Seguro remover este bloco apos um apply bem
+# sucedido (import e um no-op se o recurso ja estiver no state).
+import {
+  to = newrelic_workflow.oficina_mecanica
+  id = "54263c2a-50ac-4e6f-acb2-b3ba870192d3"
+}
+
 resource "newrelic_workflow" "oficina_mecanica" {
   name                  = "oficina-mecanica-alerts"
   muting_rules_handling = "NOTIFY_ALL_ISSUES"
